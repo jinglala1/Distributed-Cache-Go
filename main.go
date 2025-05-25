@@ -1,1 +1,7 @@
-package Distributed_Cache_Go
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello, World!")
+}
