@@ -90,7 +90,6 @@ func (c *LruCache) startCleanUpRoutine() {
 			c.log.Error(err.Error())
 		}
 	}()
-
 }
 
 // 1.向缓存中新增/更新数据
@@ -166,13 +165,54 @@ func (c *LruCache) createExpires(key string) {
 
 // 2.根据key删除缓存中的数据
 func (c *LruCache) DeleteCache(key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if element, ok := c.items[key]; ok {
+		err := c.removeCache(element)
+		if err != nil {
+			c.log.Error("DeleteCache 删除节点报错")
+			return fmt.Errorf("DeleteCache 删除节点报错:%v", err.Error())
+		}
+	}
 	return nil
 }
 
 // 4.查询缓存中的数据
-func (c *LruCache) FindCache(key string) (*LruEntry, error) {
-	entry := &LruEntry{}
-	return entry, nil
+func (c *LruCache) FindCache(key string) (*Value, bool) {
+	// 首先应该先确认key是否存在并且判断key是否超时了，如果存在且没有超时则取出来，并且将该元素放到列表尾部，如果不存在或者超时了，则查询数据库
+	c.mu.RLock()
+	element, ok := c.items[key]
+	if !ok {
+		c.mu.RUnlock()
+		return nil, false
+	}
+	// 判断该元素是否超时
+	// 获取超时时间与当前时间作比较
+	if t, ok := c.expires[key]; ok && time.Now().After(t) {
+		c.mu.RUnlock()
+		// 直接删除这个key并且返回
+		go func() {
+			err := c.DeleteCache(key)
+			if err != nil {
+				return
+			}
+		}()
+	}
+	value := element.Value.(LruEntry).value
+	c.mu.RUnlock()
+	// 将当前访问到的元素移动到list的队尾，移动时，需要设置写锁
+	c.mu.Lock()
+	// 再次检查元素是否仍然存在（可能在获取写锁期间被其他协程删除）
+	if _, ok := c.items[key]; ok {
+		c.list.MoveToBack(element)
+	}
+	c.mu.Unlock()
+	return &value, true
+}
+func (c *LruCache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.list.Len()
 }
 
 // 5.删除缓存中的数据
@@ -243,4 +283,12 @@ func (c *LruCache) evict() error {
 		}
 	}
 	return nil
+}
+
+// close 关闭缓存，停止清理协程
+func (c *LruCache) close() {
+	if c.cleanTicker != nil {
+		c.cleanTicker.Stop()
+		close(c.closeChan)
+	}
 }
