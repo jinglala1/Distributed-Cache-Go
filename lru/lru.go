@@ -13,11 +13,6 @@ import (
 // 缓存项的过期时间可以通过设置超时时间来设置。
 // 该实现是线程安全的，使用了互斥锁来保护对缓存的并发访问。
 // 该实现还支持自定义的过期回调函数，当缓存项被删除时会调用该函数。
-// todo:该实现还支持自定义的缓存项大小计算函数，可以根据实际需要来计算缓存项的大小。
-// todo；该实现还支持自定义的缓存项的比较函数，可以根据实际需要来比较缓存项的大小。
-// todo:该实现还支持自定义的缓存项的序列化和反序列化函数，可以根据实际需要来序列化和反序列化缓存项。
-// todo:该实现还支持自定义的缓存项的压缩和解压缩函数，可以根据实际需要来压缩和解压缩缓存项。
-// todo:该实现还支持自定义的缓存项的加密和解密函数，可以根据实际需要来加密和解密缓存项。
 
 // 创建lru cache结构体，我将从核心到辅助功能进行分层设计,并且将外层容器结构体和内层条路结构体分离的设计策略
 // 外层容器结构体
@@ -47,13 +42,6 @@ type LruEntry struct {
 
 type Value interface {
 	Len() int
-}
-
-// 需要传递的初始化参数
-type Options struct {
-	maxBytes        int64
-	onEvicted       func(key string, value Value)
-	cleanupInterval time.Duration
 }
 
 // 构造函数
@@ -109,14 +97,6 @@ func (c *LruCache) AddAndUpdateCache(key string, value Value) error {
 		}
 		return nil
 	}
-	// 如果不是已经存在的key再判断添加过后是否超过了当前的最大容量，如果超过了应该删除最旧的数据直到当前容量小于最大容量
-	//for c.maxBytes > 0 && c.maxBytes < c.currentBytes && c.list.Len() > 0 {
-	//	front := c.list.Front()
-	//	err := c.removeCache(front)
-	//	if err != nil {
-	//		return fmt.Errorf("AddCache 清理缓存数据报错哦:%v", err.Error())
-	//	}
-	//}
 
 	// 如果不存在话，将新数据添加到缓存中
 	c.add(key, value)
@@ -286,7 +266,7 @@ func (c *LruCache) evict() error {
 }
 
 // close 关闭缓存，停止清理协程
-func (c *LruCache) close() {
+func (c *LruCache) Close() {
 	if c.cleanTicker != nil {
 		c.cleanTicker.Stop()
 		close(c.closeChan)
