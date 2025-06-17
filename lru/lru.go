@@ -40,32 +40,28 @@ type LruEntry struct {
 	value Value
 }
 
-type Value interface {
-	Len() int
-}
-
 // 构造函数
 func NewLruCache(opt *Options) *LruCache {
 	withDefault(opt)
 	cache := &LruCache{
 		list:            list.New(),
 		items:           make(map[string]*list.Element),
-		maxBytes:        opt.maxBytes,
+		maxBytes:        opt.MaxBytes,
 		currentBytes:    0,
-		onEvicted:       opt.onEvicted,
+		onEvicted:       opt.OnEvicted,
 		expires:         make(map[string]time.Time),
-		cleanupInterval: opt.cleanupInterval,
+		cleanupInterval: opt.CleanupInterval,
 		closeChan:       make(chan struct{}),
 	}
 	cache.startCleanUpRoutine()
 	return cache
 }
 func withDefault(opt *Options) {
-	if opt.cleanupInterval <= 0 {
-		opt.cleanupInterval = time.Minute
+	if opt.CleanupInterval <= 0 {
+		opt.CleanupInterval = time.Minute
 	}
-	if opt.maxBytes <= 0 {
-		opt.maxBytes = 8 * 1024 * 1024
+	if opt.MaxBytes <= 0 {
+		opt.MaxBytes = 8 * 1024 * 1024
 	}
 }
 
@@ -158,7 +154,7 @@ func (c *LruCache) DeleteCache(key string) error {
 }
 
 // 4.查询缓存中的数据
-func (c *LruCache) FindCache(key string) (*Value, bool) {
+func (c *LruCache) FindCache(key string) (Value, bool) {
 	// 首先应该先确认key是否存在并且判断key是否超时了，如果存在且没有超时则取出来，并且将该元素放到列表尾部，如果不存在或者超时了，则查询数据库
 	c.mu.RLock()
 	element, ok := c.items[key]
@@ -187,7 +183,7 @@ func (c *LruCache) FindCache(key string) (*Value, bool) {
 		c.list.MoveToBack(element)
 	}
 	c.mu.Unlock()
-	return &value, true
+	return value, true
 }
 func (c *LruCache) Len() int {
 	c.mu.RLock()

@@ -5,15 +5,18 @@ import "time"
 type Store interface {
 	AddAndUpdateCache(key string, value Value) error
 	DeleteCache(key string) error
-	FindCache(key string) (*Value, bool)
+	FindCache(key string) (Value, bool)
 	Close()
+}
+type Value interface {
+	Len() int
 }
 
 // 需要传递的初始化参数
 type Options struct {
-	maxBytes        int64
-	onEvicted       func(key string, value Value)
-	cleanupInterval time.Duration
+	MaxBytes        int64
+	OnEvicted       func(key string, value Value)
+	CleanupInterval time.Duration
 }
 
 // CacheType 缓存类型
